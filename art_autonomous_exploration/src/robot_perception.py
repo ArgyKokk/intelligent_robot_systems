@@ -53,6 +53,7 @@ class RobotPerception:
         self.origin['y'] = 0
 
         # Initialization of robot pose
+        
         # x,y are in meters
         # x_px, y_px are in pixels
         self.robot_pose = {}
@@ -144,7 +145,6 @@ class RobotPerception:
         # Getting the Euler angles
         angles = tf.transformations.euler_from_quaternion(rotation)
         self.robot_pose['th'] = angles[2]
-
         # For debugging purposes
         if self.print_robot_pose == True:
             print self.robot_pose
@@ -223,7 +223,6 @@ class RobotPerception:
         # Get the map's origin
         self.origin['x'] = data.info.origin.position.x
         self.origin['y'] = data.info.origin.position.y
-
         # Keep a copy
         self.ogm_copy = numpy.copy(self.ogm)
 

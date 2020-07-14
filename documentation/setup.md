@@ -1,14 +1,6 @@
-## Ready-to-deploy system
+##Installation - Setup
 
-If you do not have Linux or do not want to pollute your Linux distro with extra packages, you can use the ready-to-deply OVA file located [here](https://www.dropbox.com/s/go0ekx1vexm6rg1/IRS_course_2016.ova?dl=0). Username is ```manos``` and password is ```robot2016```.
-
-Remember that the code will operate correctly but **much slower** that a real Linux installation.
-
-Note: If the OVA file throws an error when imported deactivate the USB devices from the virtual machine manager.
-
-## Installation - Setup
-
-This series of challenges require the utilization of the **STDR Simulator** which is a collection of **ROS** packages. The operating system required is **Ubuntu 14.04**.
+This series of challenges require the utilization of the **STDR Simulator** which is a collection **ROS** packages. The operating system required is **Ubuntu 14.04**.
 
 [ROS](http://www.ros.org/) is a "flexible framework for writing robot software. It is a collection of tools, libraries, and conventions that aim to simplify the task of creating complex and robust robot behavior across a wide variety of robotic platforms." 
 
@@ -16,7 +8,7 @@ This series of challenges require the utilization of the **STDR Simulator** whic
 
 ###ROS installation
 
-First of all you must install ROS. The flavour is ROS Indigo if you have Ubuntu 14.04 installed. The installation instructions can be found here:
+First of all you must install ROS. The flavour is ROS Indigo if you have Ubuntu 14.04 installed, or ROS hydro for Ubuntu 12.04. The installation instructions can be found here:
 - [ROS Indigo installation](http://wiki.ros.org/indigo/Installation/Ubuntu)
 
 ###Download the required packages
@@ -24,16 +16,7 @@ First of all you must install ROS. The flavour is ROS Indigo if you have Ubuntu 
 The required packages you have to download are STDR Simulator and the current repository. Before them install the following libraries:
 
 ```
-sudo apt-get install git mercurial ros-indigo-map-server python-pip libffi-dev
-sudo apt-get install gfortran libopenblas-dev liblapack-dev
-sudo pip install cython
-sudo pip install cffi scikit-image
-sudo easy_install scipy
-```
-
-For Ubuntu 16.04 / ROS Kinetic users, you must also install:
-```
-sudo apt-get install qt4-dev-tools qt4-qmake qt4-designer
+sudo apt-get install git mercurial ros-indigo-map-server
 ```
 
 Create a catkin repository in a folder you want (in this tutorial we create in in $HOME):
@@ -52,8 +35,6 @@ cd stdr_simulator
 git checkout autonomous_systems
 ```
 
-For Ubuntu 16.04 / ROS Kinetic users, you must erase the [following line](https://github.com/stdr-simulator-ros-pkg/stdr_simulator/blob/autonomous_systems/stdr_server/CMakeLists.txt#L40).
-
 Next, clone the Intelligent Robotic System's repository:
 ```bash
 cd ~/catkin_ws/src/
@@ -63,11 +44,10 @@ git clone https://github.com/etsardou/intelligent_robot_systems_2016.git
 Build the packages:
 ```bash
 cd ~/catkin_ws
-catkin_make -j1
+catkin_make
 
 cd ~/catkin_ws/src/intelligent_robot_systems_2016/art_autonomous_exploration/src
 make
 ```
 If the build was successful you are ok!
-
 

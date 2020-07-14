@@ -9,6 +9,7 @@ from target_selection import TargetSelection
 from path_planning import PathPlanning
 from utilities import RvizHandler
 from utilities import Print
+from copy import deepcopy
 
 from nav_msgs.msg import Path
 from geometry_msgs.msg import PoseStamped
@@ -32,7 +33,9 @@ class Navigation:
         self.target_exists = False
         self.select_another_target = 0
         self.inner_target_exists = False
-
+        
+        self.TimeOut = False
+        self.Reset = False
         # Container for the current path
         self.path = []
         # Container for the subgoals in the path
@@ -41,12 +44,12 @@ class Navigation:
         # Container for the next subtarget. Holds the index of the next subtarget
         self.next_subtarget = 0
 
-        self.count_limit = 200 # 20 sec
+        self.count_limit = 230 # 23 sec
 
         self.counter_to_next_sub = self.count_limit
 
         # Check if subgoal is reached via a timer callback
-        rospy.Timer(rospy.Duration(0.10), self.checkTarget)
+        rospy.Timer(rospy.Duration(0.1), self.checkTarget)
         
         # Read the target function
         self.target_selector = rospy.get_param("target_selector")
@@ -75,13 +78,16 @@ class Navigation:
           return
 
         self.counter_to_next_sub -= 1
-
+        
         if self.counter_to_next_sub == 0:
           Print.art_print('\n~~~~ Time reset ~~~~',Print.RED) 
           self.inner_target_exists = False
           self.target_exists = False
+          if self.Reset == False:
+			  self.TimeOut = True
+          else:
+			  self.Reset = False
           return
-
         # Get the robot pose in pixels
         [rx, ry] = [\
             self.robot_perception.robot_pose['x_px'] - \
@@ -89,19 +95,43 @@ class Navigation:
             self.robot_perception.robot_pose['y_px'] - \
                     self.robot_perception.origin['y'] / self.robot_perception.resolution\
                     ]
-
-        # Find the distance between the robot pose and the next subtarget
-        dist = math.hypot(\
-            rx - self.subtargets[self.next_subtarget][0], \
-            ry - self.subtargets[self.next_subtarget][1])
-
+        
+        
+        # remove visited sub targets
+        self.subtargets = self.subtargets[self.next_subtarget:]
+        
+        # set the next sub target as the first one that should be visited
+        self.next_subtarget = 0
+        
+        dis_x = [rx - target[0] for target in self.subtargets]
+        dis_y = [ry - target[1] for target in self.subtargets]
+        
+        #for i in range(0,len(dis_x)):
+		#	print " x dis " + str(dis_x[i])
+		#	print " y dis " + str(dis_y[i])
+        
+        # target distances
+        dist_t = [math.hypot(dis[0],dis[1]) for dis in zip(dis_x,dis_y) ]
+        
+        # find the closest target
+        min_target = 0
+        min_dis = dist_t[0]
+        for i in range(0,len(dist_t)):
+			if min_dis > dist_t[i]:
+				min_dis = dist_t[i]
+				min_target = i
+					
         ######################### NOTE: QUESTION  ##############################
         # What if a later subtarget or the end has been reached before the 
         # next subtarget? Alter the code accordingly.
+        # print " min target " + str(min_target) +  " min dis " + str(min_dis)
         # Check if distance is less than 7 px (14 cm)
-        if dist < 5:
-          self.next_subtarget += 1
+        if min_dis < 5:
+          self.next_subtarget = min_target + 1
           self.counter_to_next_sub = self.count_limit
+          # print "REACHED"
+          # print " next target " + str(self.next_subtarget) + " len " +str(len(self.subtargets))
+          
           # Check if the final subtarget has been approached
           if self.next_subtarget == len(self.subtargets):
             self.target_exists = False
@@ -137,6 +167,8 @@ class Navigation:
         # IMPORTANT: The robot must be stopped if you call this function until
         # it is over
         # Check if we have a map
+        
+        
         while self.robot_perception.have_map == False:
           Print.art_print("Navigation: No map yet", Print.RED)
           return
@@ -156,8 +188,7 @@ class Navigation:
         print "Navigation: Producing new target"
         # We are good to continue the exploration
         # Make this true in order not to call it again from the speeds assignment
-        self.target_exists = True
-              
+        self.target_exists = True            
         # Gets copies of the map and coverage
         local_ogm = self.robot_perception.getMap()
         local_ros_ogm = self.robot_perception.getRosMap()
@@ -170,11 +201,15 @@ class Navigation:
         g_robot_pose = self.robot_perception.getGlobalCoordinates(\
               [self.robot_perception.robot_pose['x_px'],\
               self.robot_perception.robot_pose['y_px']])
+        
 
         # Call the target selection function to select the next best goal
         # Choose target function
+        
+        print "TimeOut Flag " +str(self.TimeOut)
         self.path = []
         force_random = False
+        
         while len(self.path) == 0:
           start = time.time()
           target = self.target_selection.selectTarget(\
@@ -182,7 +217,7 @@ class Navigation:
                     local_coverage,\
                     self.robot_perception.robot_pose,
                     self.robot_perception.origin,
-                    self.robot_perception.resolution, 
+                    self.robot_perception.resolution,
                     force_random)
           
           self.path = self.path_planning.createPath(\
@@ -196,10 +231,33 @@ class Navigation:
                 "Path planning failed. Fallback to random target selection", \
                 Print.RED)
             force_random = True
-          
         # Reverse the path to start from the robot
         self.path = self.path[::-1]
-
+        
+        tolerance = 0.000001
+        weight_data = 0.5
+        weight_smooth = 0.1
+        new = deepcopy(self.path)
+        dims = 2
+        change = tolerance 
+        
+        # Path smoothing using gradient descent
+        if len(self.path) > 3:
+			print "PATH SMOOTHING"
+			while change >= tolerance:
+				change = 0.0
+				for i in range(1, len(new) - 1):
+					for j in range(dims):
+						x_i = self.path[i][j]
+						y_i, y_prev, y_next = new[i][j], new[i - 1][j], new[i + 1][j]
+						y_i_saved = y_i
+						y_i += weight_data * (x_i - y_i) + weight_smooth * (y_next + y_prev - (2 * y_i))
+						new[i][j] = y_i
+						change += abs(y_i - y_i_saved)
+			self.path = new
+			
+					
+        
         # Break the path to subgoals every 2 pixels (1m = 20px)
         step = 1
         n_subgoals = (int) (len(self.path)/step)
@@ -224,13 +282,24 @@ class Navigation:
         for p in self.path:
           ps = PoseStamped()
           ps.header.frame_id = "map"
-          ps.pose.position.x = 0
-          ps.pose.position.y = 0
           ######################### NOTE: QUESTION  ##############################
           # Fill the ps.pose.position values to show the path in RViz
           # You must understand what self.robot_perception.resolution
           # and self.robot_perception.origin are.
-        
+          
+          #p[0] * resolution => gives the path's point x-coordinate expressed in the map's coordinate system (meters)
+          # As the path's(p) first point-set is the pixels that are occupied by the robot, multyplying it by resolution (meter/pixel)
+          # gives the values of that point expressed in meters.
+          # Adding the robot's initial position we have a path starting from the robot's position expressed in the robot's frame.
+          ps.pose.position.x = p[0]*0.05 + self.robot_perception.origin['x']  
+          ps.pose.position.y = p[1]*0.05 + self.robot_perception.origin['y']
+          
+        #  print " x val " + str(ps.pose.position.x)
+        #  print " y  val " + str(ps.pose.position.y )
+        #  print " origin x " + str(self.robot_perception.origin['x'])
+        #  print " origin y " + str(self.robot_perception.origin['y'])
+        #  print " p0 " +str(p[0])
+        #  print " p1 " +str(p[1])
           ########################################################################
           ros_path.poses.append(ps)
         self.path_publisher.publish(ros_path)
@@ -275,11 +344,25 @@ class Navigation:
         # robot_perception and the next_subtarget [x,y]. From these, you can 
         # compute the robot velocities for the vehicle to approach the target.
         # Hint: Trigonometry is required
-
+        # if there is another subtarget , acquire its position
         if self.subtargets and self.next_subtarget <= len(self.subtargets) - 1:
             st_x = self.subtargets[self.next_subtarget][0]
             st_y = self.subtargets[self.next_subtarget][1]
-            
+
+            # align robot with the target
+            theta_target = np.arctan2(st_y - ry, st_x - rx)
+            delta_theta = (theta_target - theta)
+            # find omega
+            if delta_theta > np.pi:
+                omega = (delta_theta - 2*np.pi)/np.pi
+            elif delta_theta < -np.pi:
+                omega = (delta_theta + 2*np.pi)/np.pi
+            else:
+                omega = delta_theta/np.pi
+            # maximum magnitude for both velocities is 0.3
+            linear = 0.3 * ((1 - np.abs(omega)) ** 5)
+            angular = 0.3 * np.sign(omega)
+
         ######################### NOTE: QUESTION  ##############################
 
         return [linear, angular]

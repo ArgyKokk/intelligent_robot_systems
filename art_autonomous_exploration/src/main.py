@@ -8,7 +8,7 @@ from speeds_assignment import RobotController
 # The main function of the program
 if __name__ == '__main__':
 
-    # Wait for simulator and SLAM to initialize
+    print "Wait for simulator and SLAM to initialize"
     print "Waiting 5 seconds for initialization"
     time.sleep(5)
     

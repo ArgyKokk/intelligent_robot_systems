@@ -154,7 +154,7 @@ namespace ogmpp_map_loader
     if (x >= _ros_map.info.width || x < 0 || 
       y >= _ros_map.info.height || y < 0)
     {
-      return false;
+      return true;
     }
     return _map[x][y] < 50;
   }
@@ -163,6 +163,7 @@ namespace ogmpp_map_loader
     if (x >= _ros_map.info.width || x < 0 || 
       y >= _ros_map.info.height || y < 0)
     {
+	  
       return false;
     }
     return _map[x][y] == 50 || _map[x][y] == -1;
